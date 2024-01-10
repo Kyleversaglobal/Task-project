@@ -9,7 +9,7 @@ export function getLayout(pathname: string) {
     return UnauthenticatedLayout;
   }
 
-  if (pathname.match(/^\/homepage/)) {
+  if (pathname.match(/^\/table/)) {
     return AuthenticatedLayout;
   }
 
