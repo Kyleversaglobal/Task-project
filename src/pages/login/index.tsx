@@ -1,14 +1,25 @@
-import React from "react";
 import { Button, Checkbox, Form, Input, Row, Col } from "antd";
 import { useRouter } from "next/router";
+import { useLoginMutation } from "../store/api";
 
 const LoginPage: React.FC = () => {
   const router = useRouter();
+  const [login, { isLoading, isError }] = useLoginMutation();
 
-  const onFinish = (values: any) => {
-    console.log("Success:", values);
+  const onFinish = async (values: any) => {
+    try {
+      const response = await login({
+        username: values.username,
+        password: values.password,
+      }).unwrap();
 
-    router.push("/homepage");
+      console.log("Success:", values);
+      console.log("API Response:", response);
+
+      router.push("/table");
+    } catch (error) {
+      console.error("Failed:", error);
+    }
   };
 
   const onFinishFailed = (errorInfo: any) => {
@@ -65,10 +76,21 @@ const LoginPage: React.FC = () => {
           </Form.Item>
 
           <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
-            <Button type="primary" htmlType="submit" style={{ width: "100%" }}>
+            <Button
+              type="primary"
+              htmlType="submit"
+              style={{ width: "100%" }}
+              loading={isLoading}
+            >
               Log In
             </Button>
           </Form.Item>
+
+          {isError && (
+            <div style={{ color: "red", textAlign: "center" }}>
+              You have entered an invalid username or password
+            </div>
+          )}
 
           <div style={{ textAlign: "center", marginTop: "8px" }}>
             <span
