@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <Row justify="center" align="middle" style={{ minHeight: "100vh" }}>
-      <Col xs={24} sm={20} md={16} lg={12} xl={8}>
+      <Col xs={24} sm={20} md={16} lg={12} xl={11}>
         <Form
           name="basic"
           labelCol={{ span: 8 }}

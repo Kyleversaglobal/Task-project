@@ -1,14 +1,7 @@
 import React from "react";
-import { Button, Checkbox, Form, Input, Row, Col } from "antd";
+import { Button, Checkbox, Form, Input, Typography, Row, Col } from "antd";
 import { useRouter } from "next/router";
-
-const onFinish = (values: any) => {
-  console.log("Success:", values);
-};
-
-const onFinishFailed = (errorInfo: any) => {
-  console.log("Failed:", errorInfo);
-};
+import { useAddUserMutation } from "../store/api";
 
 type FieldType = {
   username?: string;
@@ -17,9 +10,25 @@ type FieldType = {
   confirmPassword?: string;
   remember?: boolean;
 };
-
+const { Title } = Typography;
 const SignupPage: React.FC = () => {
   const router = useRouter();
+  const [addUser, { isError, error }] = useAddUserMutation();
+
+  const onFinish = async (values: any) => {
+    try {
+      const response = await addUser({
+        username: values.username,
+        email: values.email,
+        password: values.password,
+      }).unwrap();
+
+      console.log("User registered successfully:", response);
+      router.push("/login");
+    } catch (err) {
+      console.error("User registration failed:", err);
+    }
+  };
 
   const handleLoginClick = () => {
     router.push("/login");
@@ -27,24 +36,29 @@ const SignupPage: React.FC = () => {
 
   return (
     <Row justify="center" align="middle" style={{ minHeight: "100vh" }}>
-      <Col xs={24} sm={20} md={16} lg={12} xl={8}>
+      <Col xs={24} sm={20} md={16} lg={12} xl={10}>
         <Form
           name="signup"
           labelCol={{ span: 8 }}
           wrapperCol={{ span: 16 }}
-          style={{
-            maxWidth: 500,
-            border: "1px solid #ddd",
-            padding: "20px",
-            borderRadius: "8px",
-            boxShadow: "0 2px 10px rgba(0, 0, 0, 0.1)",
-          }}
           initialValues={{ remember: true }}
           onFinish={onFinish}
-          onFinishFailed={onFinishFailed}
           autoComplete="off"
+          style={{
+            width: "100%",
+            maxWidth: 500,
+            border: "1px solid #e8e8e8",
+            padding: "30px",
+            borderRadius: "8px",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+          }}
         >
-          <h1 style={{ textAlign: "center", marginBottom: "20px" }}>Sign Up</h1>
+          <Title
+            level={2}
+            style={{ textAlign: "center", marginBottom: "20px" }}
+          >
+            Sign Up
+          </Title>
 
           <Form.Item<FieldType>
             label="Username"
@@ -110,7 +124,7 @@ const SignupPage: React.FC = () => {
             <p style={{ marginTop: 16, textAlign: "center" }}>
               Already have an account?{" "}
               <span
-                style={{ color: "blue", cursor: "pointer" }}
+                style={{ color: "#1890ff", cursor: "pointer" }}
                 onClick={handleLoginClick}
               >
                 Login now!

@@ -2,67 +2,155 @@ import React, { useState, useEffect } from "react";
 import { Table, Space, Modal, Form, Input, Button, Popconfirm } from "antd";
 import { useRouter } from "next/router";
 import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
-import { useGetQuotesQuery, Quote } from "../store/api";
+import {
+  useGetTodosQuery,
+  Todo,
+  useDeleteTodoMutation,
+  useAddTodoMutation,
+  useUpdateTodoMutation,
+} from "../store/api";
 
-interface DataItem extends Quote {
-  key: string;
+interface DataItem {
+  id: number;
+  title: string;
+  key: number;
 }
 
 const TablePage: React.FC = () => {
-  const router = useRouter();
-  const { data: quotes = [], isLoading, isError } = useGetQuotesQuery();
+  const { data: todos = [], isLoading, isError, refetch } = useGetTodosQuery();
   const [data, setData] = useState<DataItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<DataItem | null>(null);
+
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const updateTodoMutation = useUpdateTodoMutation();
+  const deleteTodoMutation = useDeleteTodoMutation();
+
+  const [form] = Form.useForm();
+  const [visible, setVisible] = useState(false);
+
+  const [addTodoForm] = Form.useForm();
+  const [addTodoVisible, setAddTodoVisible] = useState(false);
+  const addTodoMutation = useAddTodoMutation();
 
   useEffect(() => {
-    try {
-      const slicedQuotes = quotes.slice(0, 3);
-      const mappedQuotes = slicedQuotes.map((quote, index) => ({
-        ...quote,
-        key: quote.id || index.toString(),
-      }));
-
-      setData(mappedQuotes);
-    } catch (error) {
-      console.error("Error mapping quotes:", error);
+    if (forceUpdate > 0) {
+      refetch();
+      setForceUpdate(0);
     }
-  }, [quotes]);
+  }, [forceUpdate, refetch]);
 
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  useEffect(() => {
+    setData(todos.map((todo) => ({ ...todo, key: todo.id })));
+  }, [todos]);
 
-  const showModal = () => {
-    setIsModalVisible(true);
+  const handleEdit = (record: DataItem) => {
+    form.setFieldsValue({ todo: record.title });
+    setSelectedItem(record);
+    setVisible(true);
   };
 
-  const handleCancel = () => {
-    setIsModalVisible(false);
+  const handleUpdate = async () => {
+    try {
+      if (selectedItem) {
+        const updatedData = data.map((item) =>
+          item.id === selectedItem.id
+            ? { ...item, title: form.getFieldValue("todo") }
+            : item
+        );
+        setData(updatedData);
+
+        const response = await fetch(
+          `https://dummyjson.com/todos/${selectedItem.id}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ title: form.getFieldValue("todo") }),
+          }
+        );
+
+        if (response.ok) {
+          console.log("Todo updated successfully");
+        } else {
+          refetch();
+          console.error(
+            `Error updating todo. Server response: ${response.statusText}`
+          );
+        }
+
+        await refetch();
+      }
+    } catch (error) {
+      console.error("Error updating todo:", error);
+    } finally {
+      setVisible(false);
+      setSelectedItem(null);
+    }
   };
 
-  const onFinish = (values: { author: string; content: string }) => {
-    setIsModalVisible(false);
+  const handleDelete = async (record: DataItem) => {
+    try {
+      const updatedData = data.filter((item) => item.id !== record.id);
+      setData(updatedData);
+
+      const response = await fetch(`https://dummyjson.com/todos/${record.id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        console.log("Todo deleted successfully");
+      } else {
+        refetch();
+        console.error(
+          `Error deleting todo. Server response: ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      console.error("Error deleting todo:", error);
+      refetch();
+    }
   };
 
-  const handleDelete = async (id: string) => {
-    router.reload();
-  };
+  const handleAddTodo = async () => {
+    try {
+      await addTodoForm.validateFields();
 
-  const handleUpdate = (id: string) => {
-    console.log(`Update item with id: ${id}`);
-  };
+      const response = await fetch("https://dummyjson.com/todos/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: addTodoForm.getFieldValue("todo"),
+        }),
+      });
 
-  const handleAdd = () => {
-    router.push("/add-content");
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("Todo added successfully", data);
+      } else {
+        console.error("Error adding todo:", data);
+      }
+    } catch (error) {
+      console.error("Error adding todo:", error);
+    } finally {
+      setAddTodoVisible(false);
+      addTodoForm.resetFields();
+    }
   };
 
   const columns = [
     {
-      title: "Author",
-      dataIndex: "author",
-      key: "author",
+      title: "ID",
+      dataIndex: "id",
+      key: "id",
     },
     {
-      title: "Quote",
-      dataIndex: "quote",
-      key: "quote",
+      title: "To Do",
+      dataIndex: "todo",
+      key: "todo",
     },
     {
       title: "Action",
@@ -72,11 +160,11 @@ const TablePage: React.FC = () => {
           <Button
             type="primary"
             icon={<EditOutlined />}
-            onClick={() => handleUpdate(record.key)}
+            onClick={() => handleEdit(record)}
           />
           <Popconfirm
             title="Are you sure to delete this item?"
-            onConfirm={() => handleDelete(record.key)}
+            onConfirm={() => handleDelete(record)}
             okText="Yes"
             cancelText="No"
           >
@@ -86,6 +174,7 @@ const TablePage: React.FC = () => {
       ),
     },
   ];
+
   return (
     <div style={{ padding: "20px", display: "flex", flexDirection: "column" }}>
       <div
@@ -95,7 +184,11 @@ const TablePage: React.FC = () => {
           display: "flex",
         }}
       >
-        <Button type="primary" onClick={showModal} style={{ width: "100px" }}>
+        <Button
+          type="primary"
+          onClick={() => setAddTodoVisible(true)}
+          style={{ width: "100px" }}
+        >
           Add
         </Button>
       </div>
@@ -106,7 +199,7 @@ const TablePage: React.FC = () => {
         <div>Error fetching quotes</div>
       ) : (
         <Table
-          dataSource={data}
+          dataSource={todos.map((todo) => ({ ...todo, key: todo.id }))}
           columns={columns}
           pagination={{ pageSize: 5 }}
           bordered
@@ -116,39 +209,32 @@ const TablePage: React.FC = () => {
           }}
         />
       )}
-
       <Modal
-        title="Add Content"
-        open={isModalVisible}
-        onCancel={handleCancel}
-        footer={null}
+        title="Edit Todo"
+        open={visible}
+        onOk={handleUpdate}
+        onCancel={() => setVisible(false)}
       >
-        <Form name="addContent" onFinish={onFinish}>
-          <Form.Item
-            label="Author"
-            name="author"
-            rules={[{ required: true, message: "Please input the author!" }]}
-          >
+        <Form form={form} layout="vertical" initialValues={{ todo: "" }}>
+          <Form.Item label="Todo" name="todo">
             <Input />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Add Todo"
+        open={addTodoVisible}
+        onOk={handleAddTodo}
+        onCancel={() => setAddTodoVisible(false)}
+      >
+        <Form form={addTodoForm} layout="vertical" initialValues={{ todo: "" }}>
           <Form.Item
-            label="Quote"
-            name="content"
-            rules={[{ required: true, message: "Please input the quote!" }]}
+            label="Todo"
+            name="todo"
+            rules={[{ required: true, message: "Please input your todo!" }]}
           >
-            <Input.TextArea />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
-              Submit
-            </Button>
-            <Button
-              type="default"
-              onClick={handleCancel}
-              style={{ marginLeft: 8 }}
-            >
-              Cancel
-            </Button>
+            <Input />
           </Form.Item>
         </Form>
       </Modal>
